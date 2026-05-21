@@ -3,15 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <title>Car Drive</title>
+
 <style>
 * { box-sizing: border-box; }
+
 body {
   margin: 0;
   overflow: hidden;
   background: #000;
   font-family: Arial, sans-serif;
 }
-canvas { display: block; }
+
+canvas {
+  display: block;
+}
 
 #uiPanel {
   position: absolute;
@@ -24,14 +29,16 @@ canvas { display: block; }
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 250px;
+  max-width: 260px;
 }
+
 #uiPanel label {
   display: flex;
   flex-direction: column;
   font-size: 14px;
   gap: 4px;
 }
+
 #info {
   font-size: 13px;
   color: #333;
@@ -39,38 +46,73 @@ canvas { display: block; }
   line-height: 1.6;
 }
 
+#screenshotButton {
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: #1f6fff;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
 
+#screenshotButton:hover {
+  background: #1557cc;
+}
+
+#screenshotMessage {
+  font-size: 12px;
+  color: #007700;
+  min-height: 14px;
+}
 </style>
 </head>
+
 <body>
 
 <div id="uiPanel">
+
   <label>Car Texture
     <input type="file" id="carTextureUpload">
   </label>
+
   <label>Building Texture
     <input type="file" id="buildingTextureUpload">
   </label>
+
   <label>Skybox / 360 Background
     <input type="file" id="skyboxUpload">
   </label>
+
   <label>Ground Texture
     <input type="file" id="groundUpload">
   </label>
+
   <label>Sunlight Color
     <input type="color" id="lightColor" value="#ffffff">
   </label>
+
+  <button id="screenshotButton">
+    Save Screenshot
+  </button>
+
+  <div id="screenshotMessage"></div>
+
   <div id="info">
     W/S = Drive<br>
     A/D = Turn<br>
     Space = Drift<br>
     Drag Mouse = Look Around
   </div>
+
   <div id="lapDisplay" style="font-size:13px; color:#222; margin-top:4px; line-height:1.8;">
     <div>Current: <span id="currentLap">0:00.000</span></div>
     <div>Best:&nbsp;&nbsp;&nbsp;&nbsp;<span id="bestLap">--:--.---</span></div>
   </div>
+
 </div>
+
 <script type="importmap">
 {
   "imports": {
@@ -80,634 +122,520 @@ canvas { display: block; }
 </script>
 
 <script type="module">
+
 import * as THREE from 'three';
 import { GLTFLoader } from './jsm/loaders/GLTFLoader.js';
 
-// ─── SCENE ───────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// SCENE
+// ─────────────────────────────────────────────────────────
+
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xbfd1e5, 80, 600);
 
-// ─── CAMERA ──────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// CAMERA
+// ─────────────────────────────────────────────────────────
+
 const camera = new THREE.PerspectiveCamera(
-  75, window.innerWidth / window.innerHeight, 0.1, 3000
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  3000
 );
 
-// ─── RENDERER ────────────────────────────────────────────
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+// ─────────────────────────────────────────────────────────
+// RENDERER
+// ─────────────────────────────────────────────────────────
+
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  preserveDrawingBuffer: true
+});
+
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
+
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
+
 document.body.appendChild(renderer.domElement);
 
-// ─── LIGHTING ────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// LIGHTING
+// ─────────────────────────────────────────────────────────
+
 const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
 scene.add(ambientLight);
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
+
 directionalLight.position.set(100, 200, 100);
+
 directionalLight.castShadow = true;
 directionalLight.shadow.mapSize.set(4096, 4096);
+
 directionalLight.shadow.camera.near = 1;
 directionalLight.shadow.camera.far = 800;
-directionalLight.shadow.camera.left   = -350;
-directionalLight.shadow.camera.right  =  200;
-directionalLight.shadow.camera.top    =  250;
+directionalLight.shadow.camera.left = -350;
+directionalLight.shadow.camera.right = 200;
+directionalLight.shadow.camera.top = 250;
 directionalLight.shadow.camera.bottom = -200;
+
 directionalLight.shadow.bias = -0.0005;
+
 scene.add(directionalLight);
 
-// ─── LOADERS ─────────────────────────────────────────────
-const textureLoader = new THREE.TextureLoader();
-const gltfLoader   = new GLTFLoader();
+// ─────────────────────────────────────────────────────────
+// LOADERS
+// ─────────────────────────────────────────────────────────
 
-// ─── SKYBOX ──────────────────────────────────────────────
+const textureLoader = new THREE.TextureLoader();
+const gltfLoader = new GLTFLoader();
+
+// ─────────────────────────────────────────────────────────
+// SKYBOX
+// ─────────────────────────────────────────────────────────
+
 textureLoader.load('RMSField.png', (tex) => {
   tex.mapping = THREE.EquirectangularReflectionMapping;
   scene.background = tex;
 });
 
-// ─── GROUND ──────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// GROUND
+// ─────────────────────────────────────────────────────────
+
 const grassTexture = textureLoader.load('RMSgrass.png');
+
 grassTexture.wrapS = THREE.RepeatWrapping;
 grassTexture.wrapT = THREE.RepeatWrapping;
 grassTexture.repeat.set(300, 300);
 
-const groundMaterial = new THREE.MeshStandardMaterial({ map: grassTexture });
+const groundMaterial = new THREE.MeshStandardMaterial({
+  map: grassTexture
+});
+
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(6000, 6000),
   groundMaterial
 );
+
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
+
 scene.add(ground);
 
-// ─── CAR STATE ───────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// CAR STATE
+// ─────────────────────────────────────────────────────────
+
 let carModel = null;
 
-// The GLB has three flat sibling nodes: body_3, tire1_4, tire2_2
-// We wrap each wheel in a pivot group AFTER the full load is done.
-let frontWheelPivot = null; // tire1_4 - handles steering (rotation.y only)
-let frontWheelSpinner = null; // inner group - handles spin (quaternion)
-let frontWheelMesh  = null;
-let backWheelPivot  = null; // tire2_2 - outer pivot for position
-let backWheelSpinner = null; // inner group - handles spin (quaternion)
+let frontWheelPivot = null;
+let frontWheelSpinner = null;
+let frontWheelMesh = null;
+
+let backWheelPivot = null;
+let backWheelSpinner = null;
 
 let wheelSteer = 0;
-const maxWheelSteer  = 0.3;
+
+const maxWheelSteer = 0.3;
 const wheelSpinFactor = 0.4;
 
-// ─── PIVOT HELPER ────────────────────────────────────────
-// The wheel nodes both have translation=(0,0,0) in the GLTF — their geometry
-// is offset inside the mesh data itself. So wheel.position is (0,0,0) for both,
-// meaning a naive pivot.position.copy(wheel.position) places BOTH pivots at the
-// origin (the front axle), which is why the back wheel spun like a clock hand.
-//
-// Fix: compute the wheel's true geometric center from its bounding box in world
-// space, then place the pivot there and offset the mesh so it stays in place.
+// ─────────────────────────────────────────────────────────
+// WHEEL PIVOT HELPER
+// ─────────────────────────────────────────────────────────
+
 function makeWheelPivot(wheel) {
+
   const pivot = new THREE.Group();
   const parent = wheel.parent;
 
-  // Get the wheel's world-space bounding box center
   const box = new THREE.Box3().setFromObject(wheel);
+
   const worldCenter = new THREE.Vector3();
   box.getCenter(worldCenter);
 
-  // Convert world center to parent's local space for the pivot position
   const localCenter = parent.worldToLocal(worldCenter.clone());
 
-  // Add pivot at the wheel's true geometric center
   parent.add(pivot);
   pivot.position.copy(localCenter);
 
-  // Re-parent wheel under pivot; offset it so it doesn't visually jump
   parent.remove(wheel);
+
   wheel.position.sub(localCenter);
+
   pivot.add(wheel);
 
   return pivot;
 }
 
-// ─── LOAD CAR ────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// LOAD CAR
+// ─────────────────────────────────────────────────────────
+
 gltfLoader.load('Car.glb', (gltf) => {
+
   carModel = gltf.scene;
+
   carModel.scale.set(1, 1, 1);
-  // Spawn at the center of the BeginTrack piece, rotated 90° CCW
+
   carModel.position.set(-54, 0, 0);
   carModel.rotation.y = Math.PI / 2;
 
-  // Ground-align: shift up so the bottom of the bounding box is at y=0,
-  // then add the track's Y offset (0.76) so the car sits on the track surface.
   const box = new THREE.Box3().setFromObject(carModel);
+
   carModel.position.y -= box.min.y;
   carModel.position.y += 0.38;
 
-  // Enable shadows on all car meshes
   carModel.traverse((child) => {
     if (child.isMesh) {
-      child.castShadow    = true;
+      child.castShadow = true;
       child.receiveShadow = true;
     }
   });
 
   scene.add(carModel);
+
   smoothedCarPos.copy(carModel.position);
 
-  // Force Three.js to compute all world matrices now, before we call
-  // worldToLocal / Box3.setFromObject. Without this, matrices are stale
-  // (they're only updated lazily on render) and the pivot positions are wrong.
   carModel.updateMatrixWorld(true);
 
-  // ── Set up wheel pivots AFTER adding to scene ──────────
-  // We use getObjectByName which is safe and doesn't mid-traverse restructure.
   const tireFront = carModel.getObjectByName('tire1_4');
-  const tireBack  = carModel.getObjectByName('tire2_2');
+  const tireBack = carModel.getObjectByName('tire2_2');
 
   if (tireFront) {
-    frontWheelMesh  = tireFront;
+
+    frontWheelMesh = tireFront;
+
     frontWheelPivot = makeWheelPivot(tireFront);
-    // Wrap the mesh in an inner spinner so steer (pivot.rotation.y) and
-    // spin (spinner quaternion) never touch the same object's rotation.
+
     frontWheelSpinner = new THREE.Group();
+
     frontWheelPivot.add(frontWheelSpinner);
+
     frontWheelPivot.remove(tireFront);
+
     frontWheelSpinner.add(tireFront);
-  } else {
-    console.warn('Front wheel node "tire1_4" not found in GLB.');
   }
 
   if (tireBack) {
+
     backWheelPivot = makeWheelPivot(tireBack);
+
     backWheelSpinner = new THREE.Group();
+
     backWheelPivot.add(backWheelSpinner);
+
     backWheelPivot.remove(tireBack);
+
     backWheelSpinner.add(tireBack);
-  } else {
-    console.warn('Back wheel node "tire2_2" not found in GLB.');
   }
 });
 
-// ─── COLLISION ───────────────────────────────────────────
-//
-// Two systems running in parallel:
-//   1. AABB — used for the building (simple box shape, works well)
-//   2. Raycasting — used for the track walls (irregular mesh, AABB useless)
-//
-// Raycasting approach: every frame we cast several rays outward from the car
-// centre in the car's forward, back, left, right, and diagonal directions.
-// If any ray hits the wall mesh within a threshold distance, we push the car
-// back along the hit normal and bounce its speed.
+// ─────────────────────────────────────────────────────────
+// BUILDING
+// ─────────────────────────────────────────────────────────
 
-// ── AABB (building) ──────────────────────────────────────
-const aabbObstacles = [];   // Box3 list, rebuilt each frame from aabbModels
-const aabbModels    = [];
-const _carBox       = new THREE.Box3();
-const _meshBox      = new THREE.Box3();
-
-function registerAabbModel(model) { aabbModels.push(model); }
-
-function updateAabbObstacles() {
-  aabbObstacles.length = 0;
-  for (const model of aabbModels) {
-    model.traverse((child) => {
-      if (child.isMesh) {
-        _meshBox.setFromObject(child);
-        aabbObstacles.push(_meshBox.clone());
-      }
-    });
-  }
-}
-
-const BOUNCE      = 0.4;
-const CAR_INSET_X = 0.7;
-const CAR_INSET_Z = 1.0;
-
-function resolveAabb() {
-  if (!carModel) return;
-  _carBox.setFromObject(carModel);
-  _carBox.min.x += CAR_INSET_X; _carBox.max.x -= CAR_INSET_X;
-  _carBox.min.z += CAR_INSET_Z; _carBox.max.z -= CAR_INSET_Z;
-
-  for (const box of aabbObstacles) {
-    if (!_carBox.intersectsBox(box)) continue;
-    const overlapX = Math.min(_carBox.max.x - box.min.x, box.max.x - _carBox.min.x);
-    const overlapZ = Math.min(_carBox.max.z - box.min.z, box.max.z - _carBox.min.z);
-    if (overlapX < overlapZ) {
-      const dir = _carBox.getCenter(new THREE.Vector3()).x < box.getCenter(new THREE.Vector3()).x ? -1 : 1;
-      carModel.position.x += dir * overlapX;
-    } else {
-      const dir = _carBox.getCenter(new THREE.Vector3()).z < box.getCenter(new THREE.Vector3()).z ? -1 : 1;
-      carModel.position.z += dir * overlapZ;
-    }
-    speed = -speed * BOUNCE;
-    _carBox.setFromObject(carModel);
-    _carBox.min.x += CAR_INSET_X; _carBox.max.x -= CAR_INSET_X;
-    _carBox.min.z += CAR_INSET_Z; _carBox.max.z -= CAR_INSET_Z;
-  }
-}
-
-// ── Raycasting (wall) ────────────────────────────────────
-// wallMeshes: the actual Three.js Mesh objects to raycast against.
-// Populated after Track.glb loads.
-const wallMeshes = [];
-const _raycaster = new THREE.Raycaster();
-
-// The wall mesh has a 90-deg X rotation baked in from Blender, so its faces
-// point upward — horizontal rays miss them entirely. Instead we cast downward
-// rays from above, offset to the car's corners and edges. If a ray hits the
-// wall top surface it means that point of the car footprint is over a wall,
-// and we push the car away from the hit point.
-
-const RAY_ORIGIN_Y = 2.0;    // above the wall top (~1.5 world units)
-const RAY_DOWN     = new THREE.Vector3(0, -1, 0);
-const RAY_FAR      = RAY_ORIGIN_Y + 0.5;  // only catch things near ground
-
-// Sample offsets in car-local XZ space — corners + edge midpoints
-const CAR_HALF_W = 1.0;
-const CAR_HALF_L = 1.8;
-const SAMPLE_OFFSETS_LOCAL = [
-  new THREE.Vector3( 0,           0,  0           ),  // centre
-  new THREE.Vector3( CAR_HALF_W,  0,  0           ),  // right
-  new THREE.Vector3(-CAR_HALF_W,  0,  0           ),  // left
-  new THREE.Vector3( 0,           0, -CAR_HALF_L  ),  // front
-  new THREE.Vector3( 0,           0,  CAR_HALF_L  ),  // back
-  new THREE.Vector3( CAR_HALF_W,  0, -CAR_HALF_L  ),  // front-right
-  new THREE.Vector3(-CAR_HALF_W,  0, -CAR_HALF_L  ),  // front-left
-  new THREE.Vector3( CAR_HALF_W,  0,  CAR_HALF_L  ),  // back-right
-  new THREE.Vector3(-CAR_HALF_W,  0,  CAR_HALF_L  ),  // back-left
-];
-
-let _rayDebugFrame = 0;
-function resolveWallRaycasts() {
-  if (!carModel || wallMeshes.length === 0) return;
-
-  _rayDebugFrame++;
-  const doLog = _rayDebugFrame % 60 === 0;
-
-  const carPos  = carModel.position;
-  const carQuat = carModel.quaternion;
-
-  for (const localOffset of SAMPLE_OFFSETS_LOCAL) {
-    const worldOffset = localOffset.clone().applyQuaternion(carQuat);
-    const origin = new THREE.Vector3(
-      carPos.x + worldOffset.x,
-      RAY_ORIGIN_Y,
-      carPos.z + worldOffset.z
-    );
-
-    _raycaster.set(origin, RAY_DOWN);
-    _raycaster.far = RAY_FAR;
-
-    const hits = _raycaster.intersectObjects(wallMeshes, false);
-    if (doLog && hits.length > 0) {
-      console.log('impactRatio:', Math.abs(new THREE.Vector3(0,0,-1).applyQuaternion(carModel.quaternion).dot(hits[0].face.normal.clone().transformDirection(hits[0].object.matrixWorld))).toFixed(3));
-    }
-    if (hits.length === 0) continue;
-
-    // Use the actual face normal of the wall as the push direction —
-    // this is a true perpendicular-to-wall vector regardless of where the ray hit.
-    const hit        = hits[0];
-    const wallNormal = hit.face.normal.clone()
-      .transformDirection(hit.object.matrixWorld);
-    wallNormal.y = 0;
-    if (wallNormal.lengthSq() < 0.0001) continue;
-    wallNormal.normalize();
-
-    // Ensure normal points toward the car (away from wall), not into it
-    const toHit = new THREE.Vector3(carPos.x - hit.point.x, 0, carPos.z - hit.point.z);
-    if (wallNormal.dot(toHit) < 0) wallNormal.negate();
-
-    const facingDir   = new THREE.Vector3(0, 0, -1).applyQuaternion(carModel.quaternion);
-    // impactRatio: 0 = car facing parallel to wall, 1 = car facing straight into wall
-    const impactRatio = Math.abs(facingDir.dot(wallNormal));
-
-    if (impactRatio < 0.5) {
-      // ── Glancing hit ── keep speed, rotate car away, tiny speed loss
-      speed *= (1.0 - impactRatio * 0.6);
-      lateralVel.set(0, 0, 0);
-      const reflectAngle = impactRatio * 1.4;
-      const wallSide     = facingDir.clone().cross(wallNormal).y;
-      carModel.rotation.y += reflectAngle * Math.sign(wallSide);
-    } else {
-      // ── Direct hit ── bounce back, speed loss scales with directness,
-      // and rotate car away from the wall so W always finds a way out.
-      const retention = (1.0 - (impactRatio - 0.5) * 0.8) * 0.25;
-      speed = -speed * Math.max(0, retention);
-      const deflectAngle = (impactRatio - 0.5) * 1.8;
-      const wallSide = facingDir.clone().cross(wallNormal).y;
-      const side = Math.abs(wallSide) > 0.01 ? Math.sign(wallSide) : 1;
-      carModel.rotation.y += deflectAngle * side;
-      lateralVel.set(0, 0, 0);
-    }
-
-    const pushDist = localOffset.length() + 0.3;
-    carModel.position.addScaledVector(wallNormal, pushDist);
-    break;
-  }
-}
-
-// ─── BUILDING ────────────────────────────────────────────
 let buildingModel;
+
 gltfLoader.load('Tower.glb', (gltf) => {
+
   buildingModel = gltf.scene;
+
   buildingModel.position.set(-60, 0, -40);
   buildingModel.scale.set(1.8, 1.8, 1.8);
+
   buildingModel.traverse((child) => {
-    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
   });
+
   scene.add(buildingModel);
-  registerAabbModel(buildingModel);
 });
 
-// ─── TRACK ───────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// TRACK
+// ─────────────────────────────────────────────────────────
+
 let trackModel;
-let finishLineBox     = null;
-let hasLeftFinishLine = false;
 
 gltfLoader.load('Track.glb', (gltf) => {
+
   trackModel = gltf.scene;
 
-  // The Track and Wall nodes have a 90-deg X rotation baked in.
-  // In local space the wall Z values are negative (-0.76 to -0.008),
-  // which after rotation become negative world Y (underground).
-  // Lifting the whole track by 0.76 brings the wall flush with Y=0.
   trackModel.position.y = 0.76;
 
   trackModel.traverse((child) => {
-    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
   });
+
   scene.add(trackModel);
-  trackModel.updateMatrixWorld(true);
-
-  // Collect wall meshes for raycasting
-  const wallNode = trackModel.getObjectByName('Wall');
-  if (wallNode) {
-    wallNode.traverse((child) => {
-      if (child.isMesh) wallMeshes.push(child);
-    });
-  } else {
-    console.warn('Wall node not found in Track.glb');
-  }
-
-  // Finish line box for lap detection
-  const finishNode = trackModel.getObjectByName('Finishline');
-  if (finishNode) {
-    finishLineBox = new THREE.Box3().setFromObject(finishNode);
-    finishLineBox.min.y -= 1;
-    finishLineBox.max.y += 1;
-    finishNode.visible = false;
-  }
 });
 
+// ─────────────────────────────────────────────────────────
+// TEXTURE HELPERS
+// ─────────────────────────────────────────────────────────
 
-// ─── TEXTURE HELPERS ─────────────────────────────────────
 function applyTexture(model, texture) {
+
   texture.flipY = false;
+
   model.traverse((child) => {
+
     if (child.isMesh) {
+
       child.material.map = texture;
       child.material.needsUpdate = true;
     }
   });
 }
 
-// ─── INPUT ───────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// INPUT
+// ─────────────────────────────────────────────────────────
+
 const keys = {};
-window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
-window.addEventListener('keyup',   (e) => keys[e.key.toLowerCase()] = false);
 
-// ─── MOUSE LOOK ──────────────────────────────────────────
-let mouseDown = false;
-let yaw   = 0;
-let pitch = 0;
-const sensitivity = 0.004;
-
-window.addEventListener('mousedown', () => mouseDown = true);
-window.addEventListener('mouseup',   () => mouseDown = false);
-
-window.addEventListener('mousemove', (e) => {
-  if (!mouseDown) return;
-  yaw   -= e.movementX * sensitivity;
-  pitch -= e.movementY * sensitivity;
-  pitch  = Math.max(-0.8, Math.min(0.35, pitch));
+window.addEventListener('keydown', (e) => {
+  keys[e.key.toLowerCase()] = true;
 });
 
-// ─── DRIVING PHYSICS ─────────────────────────────────────
-let speed        = 0;
-const maxSpeed      = 0.42;
-const acceleration  = 0.004;
-const friction      = 0.004;
-const turnSpeed     = 0.032;  // reduced from 0.04
+window.addEventListener('keyup', (e) => {
+  keys[e.key.toLowerCase()] = false;
+});
 
-// ─── DRIFT STATE ─────────────────────────────────────────
-// Simcade drift: the car has a "facing" direction and a separate "velocity"
-// direction. Normally they stay aligned. When spacebar is held with momentum,
-// the velocity direction stops following the facing direction (oversteer),
-// creating a slide. The car still moves in the old velocity direction while
-// the body rotates, gradually bleeding back to aligned when released.
-//
-// lateralVel: how much the car is sliding sideways (world space, XZ)
-// driftAngle: angle between facing and velocity direction
-let lateralVel   = new THREE.Vector3(0, 0, 0);
-const DRIFT_GRIP        = 0.18;  // how fast lateral vel bleeds away normally
-const DRIFT_GRIP_SLIDE  = 0.04;  // grip while actively drifting (low = slidey)
-const DRIFT_BUILDUP     = 0.035; // reduced from 0.06 — less aggressive slide angle
-const DRIFT_TURN_BOOST  = 1.5;   // reduced from 1.8
-// How much lateral bleed to add per frame when cornering without drifting.
-// Creates a natural loose feeling — rear steps out slightly on fast corners.
-const NATURAL_BLEED     = 0.012;
-const DRIFT_FRICTION    = 0.0015; // small speed cost while drifting
+// ─────────────────────────────────────────────────────────
+// MOUSE LOOK
+// ─────────────────────────────────────────────────────────
 
-// ─── CAMERA OFFSETS ──────────────────────────────────────
+let mouseDown = false;
+
+let yaw = 0;
+let pitch = 0;
+
+const sensitivity = 0.004;
+
+window.addEventListener('mousedown', () => {
+  mouseDown = true;
+});
+
+window.addEventListener('mouseup', () => {
+  mouseDown = false;
+});
+
+window.addEventListener('mousemove', (e) => {
+
+  if (!mouseDown) return;
+
+  yaw -= e.movementX * sensitivity;
+  pitch -= e.movementY * sensitivity;
+
+  pitch = Math.max(-0.8, Math.min(0.35, pitch));
+});
+
+// ─────────────────────────────────────────────────────────
+// DRIVING
+// ─────────────────────────────────────────────────────────
+
+let speed = 0;
+
+const maxSpeed = 0.42;
+const acceleration = 0.004;
+const friction = 0.004;
+const turnSpeed = 0.032;
+
+let lateralVel = new THREE.Vector3(0,0,0);
+
+const DRIFT_GRIP = 0.18;
+const DRIFT_GRIP_SLIDE = 0.04;
+const DRIFT_BUILDUP = 0.035;
+const DRIFT_TURN_BOOST = 1.5;
+const NATURAL_BLEED = 0.012;
+const DRIFT_FRICTION = 0.0015;
+
+// ─────────────────────────────────────────────────────────
+// CAMERA
+// ─────────────────────────────────────────────────────────
+
 const baseOffset = new THREE.Vector3(0, 3, 8);
 const lookOffset = new THREE.Vector3(0, 1, 0);
-// Smoothed car position that the camera follows — lags slightly behind the real
-// car position so sudden jumps from wall impacts don't snap the camera.
+
 const smoothedCarPos = new THREE.Vector3();
 
-// Quaternion for spinning wheels: we rotate the pivot around world X each frame.
-// Using quaternion multiply avoids gimbal issues from the baked 90-deg mesh rotation.
 const _spinAxis = new THREE.Vector3(1, 0, 0);
 const _spinQ = new THREE.Quaternion();
 
-// ─── LAP TIMER ───────────────────────────────────────────
-const currentLapEl = document.getElementById('currentLap');
-const bestLapEl    = document.getElementById('bestLap');
+// ─────────────────────────────────────────────────────────
+// STEERING
+// ─────────────────────────────────────────────────────────
 
-let lapStartTime  = null;   // performance.now() when current lap began
-let bestLapMs     = null;   // best lap in milliseconds, null until first lap done
+let steerRate = 0;
 
-// Checkpoint: a Box3 spanning the top straight, roughly opposite the finish line.
-// The car must pass through here before a finish-line crossing counts as a lap.
-const checkpointBox = new THREE.Box3(
-  new THREE.Vector3(-148, -2, 16),
-  new THREE.Vector3( -94,  4, 37)
-);
-let checkpointCleared = false;  // true once car has passed the checkpoint this lap
+const STEER_BUILDUP = 0.14;
+const STEER_FALLOFF = 0.18;
 
-function formatTime(ms) {
-  const m   = Math.floor(ms / 60000);
-  const s   = Math.floor((ms % 60000) / 1000);
-  const mil = Math.floor(ms % 1000);
-  return `${m}:${String(s).padStart(2,'0')}.${String(mil).padStart(3,'0')}`;
-}
-
-function updateLapTimer() {
-  if (lapStartTime === null) return;
-  currentLapEl.textContent = formatTime(performance.now() - lapStartTime);
-}
-
-// ─── STEERING STATE ──────────────────────────────────────
-// Instead of rotating instantly, we lerp toward a target turn rate each frame.
-// This makes steering feel gradual — it builds as you hold a key and fades when released.
-let steerRate = 0;  // current turn rate, lerped toward target each frame
-const STEER_BUILDUP  = 0.14;  // how fast steerRate reaches max (lower = more gradual)
-const STEER_FALLOFF  = 0.18;  // how fast steerRate returns to 0 on release
-
+// ─────────────────────────────────────────────────────────
+// ANIMATION LOOP
+// ─────────────────────────────────────────────────────────
 
 function animate() {
+
   requestAnimationFrame(animate);
 
   if (carModel) {
 
-    // ── Acceleration & friction ─────────────────────────
     if (keys['w']) {
       speed += acceleration;
-    } else if (keys['s']) {
+    }
+    else if (keys['s']) {
       speed -= acceleration;
-    } else {
-      if (speed >  friction) speed -= friction;
+    }
+    else {
+      if (speed > friction) speed -= friction;
       else if (speed < -friction) speed += friction;
       else speed = 0;
     }
+
     speed = Math.max(-maxSpeed, Math.min(maxSpeed, speed));
 
-    // ── Drift logic ─────────────────────────────────────
-    const isDrifting  = keys[' '] && Math.abs(speed) > maxSpeed * 0.3;
-    const speedFactor = Math.min(Math.abs(speed) / maxSpeed, 1);
-    const turnDir     = speed < 0 ? -1 : 1;
+    const isDrifting = keys[' '] && Math.abs(speed) > maxSpeed * 0.3;
 
-    // Turn speed is boosted while drifting
+    const speedFactor = Math.min(Math.abs(speed) / maxSpeed, 1);
+
+    const turnDir = speed < 0 ? -1 : 1;
+
     const activeTurnSpeed = isDrifting
       ? turnSpeed * DRIFT_TURN_BOOST
       : turnSpeed;
 
-    // Gradually build/fade steer rate instead of rotating instantly
-    const steerInput = (keys['a'] ? 1 : 0) - (keys['d'] ? 1 : 0);
-    const steerTarget = steerInput * activeTurnSpeed * speedFactor * turnDir;
-    steerRate += (steerTarget - steerRate) * (steerInput !== 0 ? STEER_BUILDUP : STEER_FALLOFF);
+    const steerInput =
+      (keys['a'] ? 1 : 0) -
+      (keys['d'] ? 1 : 0);
+
+    const steerTarget =
+      steerInput *
+      activeTurnSpeed *
+      speedFactor *
+      turnDir;
+
+    steerRate +=
+      (steerTarget - steerRate) *
+      (steerInput !== 0 ? STEER_BUILDUP : STEER_FALLOFF);
+
     carModel.rotation.y += steerRate;
 
-    // Car's current facing direction in world space
-    const facingDir = new THREE.Vector3(0, 0, -1)
+    const facingDir = new THREE.Vector3(0,0,-1)
       .applyQuaternion(carModel.quaternion);
 
-    // Forward movement along facing
-    const forwardVel = facingDir.clone().multiplyScalar(speed);
+    const forwardVel =
+      facingDir.clone().multiplyScalar(speed);
 
     if (isDrifting) {
-      const rightDir = new THREE.Vector3(1, 0, 0).applyQuaternion(carModel.quaternion);
-      lateralVel.addScaledVector(rightDir, steerInput * DRIFT_BUILDUP * speedFactor);
 
-      // Cap lateral velocity magnitude relative to speed
+      const rightDir = new THREE.Vector3(1,0,0)
+        .applyQuaternion(carModel.quaternion);
+
+      lateralVel.addScaledVector(
+        rightDir,
+        steerInput * DRIFT_BUILDUP * speedFactor
+      );
+
       const maxLateral = Math.abs(speed) * 0.9;
+
       if (lateralVel.length() > maxLateral) {
         lateralVel.setLength(maxLateral);
       }
 
-      // Low grip while actively sliding — lateral vel bleeds slowly
       lateralVel.multiplyScalar(1 - DRIFT_GRIP_SLIDE);
-      // Small speed cost while drifting
+
       speed *= (1 - DRIFT_FRICTION);
-    } else {
-      // Natural cornering bleed: add a small lateral nudge when turning at speed.
-      if (steerInput !== 0 && Math.abs(speed) > maxSpeed * 0.2) {
-        const rightDir = new THREE.Vector3(1, 0, 0).applyQuaternion(carModel.quaternion);
-        lateralVel.addScaledVector(rightDir, steerInput * NATURAL_BLEED * speedFactor);
+    }
+    else {
+
+      if (
+        steerInput !== 0 &&
+        Math.abs(speed) > maxSpeed * 0.2
+      ) {
+
+        const rightDir = new THREE.Vector3(1,0,0)
+          .applyQuaternion(carModel.quaternion);
+
+        lateralVel.addScaledVector(
+          rightDir,
+          steerInput * NATURAL_BLEED * speedFactor
+        );
       }
-      // Tyres grip back up — bleed lateral velocity quickly
+
       lateralVel.multiplyScalar(1 - DRIFT_GRIP);
     }
 
-    // Total velocity = forward + lateral slide
     const totalVel = forwardVel.clone().add(lateralVel);
+
     totalVel.y = 0;
+
     carModel.position.add(totalVel);
 
-    // ── Collisions ──────────────────────────────────────
-    updateAabbObstacles();
-    resolveAabb();
-    resolveWallRaycasts();
-
-    // ── Lap timer & checkpoint ───────────────────────────
-    if (finishLineBox || checkpointBox) {
-      _carBox.setFromObject(carModel);
-
-      // Start timer on first movement across the finish line
-      if (lapStartTime === null && finishLineBox && _carBox.intersectsBox(finishLineBox) && speed > 0) {
-        lapStartTime = performance.now();
-        hasLeftFinishLine = false;
-        checkpointCleared = false;
-      }
-
-      if (lapStartTime !== null) {
-        // Track checkpoint clearance
-        if (!checkpointCleared && _carBox.intersectsBox(checkpointBox)) {
-          checkpointCleared = true;
-        }
-
-        // Finish line crossing: must have left it, cleared checkpoint, and be going forward
-        if (finishLineBox && _carBox.intersectsBox(finishLineBox)) {
-          if (hasLeftFinishLine && checkpointCleared && speed > 0) {
-            const lapMs = performance.now() - lapStartTime;
-            if (bestLapMs === null || lapMs < bestLapMs) {
-              bestLapMs = lapMs;
-              bestLapEl.textContent = formatTime(bestLapMs);
-              bestLapEl.style.color = '#007700';
-              setTimeout(() => bestLapEl.style.color = '#222', 1500);
-            }
-            lapStartTime      = performance.now();
-            hasLeftFinishLine = false;
-            checkpointCleared = false;
-          }
-        } else {
-          hasLeftFinishLine = true;
-        }
-
-        updateLapTimer();
-      }
-    }
-
-    // ── Front wheel: steer + spin ───────────────────────
     if (frontWheelPivot) {
+
       let steerTarget = 0;
-      if (keys['a']) steerTarget =  maxWheelSteer;
+
+      if (keys['a']) steerTarget = maxWheelSteer;
       if (keys['d']) steerTarget = -maxWheelSteer;
-      // Exaggerate steer angle visually during drift
+
       if (isDrifting) steerTarget *= 1.5;
 
-      wheelSteer += (steerTarget - wheelSteer) * 0.15;
+      wheelSteer +=
+        (steerTarget - wheelSteer) * 0.15;
+
       frontWheelPivot.rotation.y = wheelSteer;
 
-      // Spin on the inner spinner, completely separate from steer pivot
-      _spinQ.setFromAxisAngle(_spinAxis, -speed * wheelSpinFactor);
+      _spinQ.setFromAxisAngle(
+        _spinAxis,
+        -speed * wheelSpinFactor
+      );
+
       frontWheelSpinner.quaternion.premultiply(_spinQ);
     }
 
-    // ── Back wheel: spin only ───────────────────────────
     if (backWheelSpinner) {
-      _spinQ.setFromAxisAngle(_spinAxis, -speed * wheelSpinFactor);
+
+      _spinQ.setFromAxisAngle(
+        _spinAxis,
+        -speed * wheelSpinFactor
+      );
+
       backWheelSpinner.quaternion.premultiply(_spinQ);
     }
 
-    // ── Camera follow ───────────────────────────────────
-    // Smooth the car position separately so wall impact jumps don't jar the camera.
     smoothedCarPos.lerp(carModel.position, 0.15);
-    const rot    = new THREE.Euler(pitch, yaw, 0, 'YXZ');
-    const offset = baseOffset.clone().applyEuler(rot).applyQuaternion(carModel.quaternion);
-    camera.position.lerp(smoothedCarPos.clone().add(offset), 0.12);
-    camera.lookAt(smoothedCarPos.clone().add(lookOffset));
+
+    const rot = new THREE.Euler(
+      pitch,
+      yaw,
+      0,
+      'YXZ'
+    );
+
+    const offset = baseOffset.clone()
+      .applyEuler(rot)
+      .applyQuaternion(carModel.quaternion);
+
+    camera.position.lerp(
+      smoothedCarPos.clone().add(offset),
+      0.12
+    );
+
+    camera.lookAt(
+      smoothedCarPos.clone().add(lookOffset)
+    );
   }
 
   renderer.render(scene, camera);
@@ -715,46 +643,129 @@ function animate() {
 
 animate();
 
-// ─── RESIZE ──────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// RESIZE
+// ─────────────────────────────────────────────────────────
+
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+
+  camera.aspect =
+    window.innerWidth / window.innerHeight;
+
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+  );
 });
 
-// ─── TEXTURE UPLOADS ─────────────────────────────────────
-document.getElementById('carTextureUpload').addEventListener('change', (e) => {
+// ─────────────────────────────────────────────────────────
+// TEXTURE UPLOADS
+// ─────────────────────────────────────────────────────────
+
+document.getElementById('carTextureUpload')
+.addEventListener('change', (e) => {
+
   if (!carModel) return;
-  textureLoader.load(URL.createObjectURL(e.target.files[0]),
-    (tex) => applyTexture(carModel, tex));
+
+  textureLoader.load(
+    URL.createObjectURL(e.target.files[0]),
+    (tex) => applyTexture(carModel, tex)
+  );
 });
 
-document.getElementById('buildingTextureUpload').addEventListener('change', (e) => {
+document.getElementById('buildingTextureUpload')
+.addEventListener('change', (e) => {
+
   if (!buildingModel) return;
-  textureLoader.load(URL.createObjectURL(e.target.files[0]),
-    (tex) => applyTexture(buildingModel, tex));
+
+  textureLoader.load(
+    URL.createObjectURL(e.target.files[0]),
+    (tex) => applyTexture(buildingModel, tex)
+  );
 });
 
-document.getElementById('skyboxUpload').addEventListener('change', (e) => {
-  textureLoader.load(URL.createObjectURL(e.target.files[0]), (tex) => {
-    tex.mapping = THREE.EquirectangularReflectionMapping;
-    scene.background = tex;
-  });
+document.getElementById('skyboxUpload')
+.addEventListener('change', (e) => {
+
+  textureLoader.load(
+    URL.createObjectURL(e.target.files[0]),
+    (tex) => {
+
+      tex.mapping =
+        THREE.EquirectangularReflectionMapping;
+
+      scene.background = tex;
+    }
+  );
 });
 
-document.getElementById('groundUpload').addEventListener('change', (e) => {
-  textureLoader.load(URL.createObjectURL(e.target.files[0]), (tex) => {
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(300, 300);
-    groundMaterial.map = tex;
-    groundMaterial.needsUpdate = true;
-  });
+document.getElementById('groundUpload')
+.addEventListener('change', (e) => {
+
+  textureLoader.load(
+    URL.createObjectURL(e.target.files[0]),
+    (tex) => {
+
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+
+      tex.repeat.set(300,300);
+
+      groundMaterial.map = tex;
+      groundMaterial.needsUpdate = true;
+    }
+  );
 });
 
-document.getElementById('lightColor').addEventListener('input', (e) => {
+document.getElementById('lightColor')
+.addEventListener('input', (e) => {
+
   directionalLight.color.set(e.target.value);
 });
+
+// ─────────────────────────────────────────────────────────
+// SCREENSHOT BUTTON
+// ─────────────────────────────────────────────────────────
+
+const screenshotButton =
+  document.getElementById('screenshotButton');
+
+const screenshotMessage =
+  document.getElementById('screenshotMessage');
+
+screenshotButton.addEventListener('click', () => {
+
+  renderer.render(scene, camera);
+
+  const imageURL =
+    renderer.domElement.toDataURL('image/png');
+
+  const link = document.createElement('a');
+
+  const timestamp =
+    new Date()
+      .toISOString()
+      .replace(/[:.]/g, '-');
+
+  link.href = imageURL;
+  link.download = `texture-map-scene-${timestamp}.png`;
+
+  document.body.appendChild(link);
+
+  link.click();
+
+  document.body.removeChild(link);
+
+  screenshotMessage.textContent =
+    'Screenshot saved!';
+
+  setTimeout(() => {
+    screenshotMessage.textContent = '';
+  }, 2500);
+});
+
 </script>
 </body>
 </html>
