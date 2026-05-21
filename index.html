@@ -38,9 +38,47 @@ canvas { display: block; }
   margin-top: 6px;
   line-height: 1.6;
 }
+
+#lockOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  pointer-events: none; /* lets clicks through to the UI panel */
+}
+#lockOverlay .lock-icon {
+  font-size: 64px;
+  line-height: 1;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.8));
+}
+#lockOverlay .lock-msg {
+  font-size: 22px;
+  font-weight: bold;
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.9);
+  text-align: center;
+  max-width: 420px;
+  line-height: 1.4;
+}
+#lockOverlay .lock-sub {
+  font-size: 15px;
+  color: rgba(255,255,255,0.7);
+  text-align: center;
+}
 </style>
 </head>
 <body>
+
+<div id="lockOverlay">
+  <div class="lock-icon">🔒</div>
+  <div class="lock-msg">Upload a car texture to start driving</div>
+  <div class="lock-sub">Use the "Car Texture" file picker in the top-left panel</div>
+</div>
 
 <div id="uiPanel">
   <label>Car Texture
@@ -87,6 +125,11 @@ import { GLTFLoader } from './jsm/loaders/GLTFLoader.js';
 // ─── SCENE ───────────────────────────────────────────────
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xbfd1e5, 80, 600);
+
+// ─── DRIVE LOCK ──────────────────────────────────────────
+// Driving is disabled until the student uploads a car texture.
+let carTextureApplied = false;
+const lockOverlay = document.getElementById('lockOverlay');
 
 // ─── CAMERA ──────────────────────────────────────────────
 const camera = new THREE.PerspectiveCamera(
@@ -493,7 +536,7 @@ const STEER_FALLOFF  = 0.18;
 function animate() {
   requestAnimationFrame(animate);
 
-  if (carModel) {
+  if (carModel && carTextureApplied) {
 
     // ── Acceleration & friction ─────────────────────────
     if (keys['w']) {
@@ -633,8 +676,14 @@ window.addEventListener('resize', () => {
 // ─── TEXTURE UPLOADS ─────────────────────────────────────
 document.getElementById('carTextureUpload').addEventListener('change', (e) => {
   if (!carModel) return;
-  textureLoader.load(URL.createObjectURL(e.target.files[0]),
-    (tex) => applyTexture(carModel, tex));
+  textureLoader.load(URL.createObjectURL(e.target.files[0]), (tex) => {
+    applyTexture(carModel, tex);
+    // Unlock driving on first car texture upload
+    if (!carTextureApplied) {
+      carTextureApplied = true;
+      lockOverlay.style.display = 'none';
+    }
+  });
 });
 
 document.getElementById('buildingTextureUpload').addEventListener('change', (e) => {
