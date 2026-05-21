@@ -60,6 +60,9 @@ canvas { display: block; }
   <label>Sunlight Color
     <input type="color" id="lightColor" value="#ffffff">
   </label>
+  <button id="screenshotBtn" style="padding:6px 10px;border-radius:6px;cursor:pointer;font-size:13px;">
+    Screenshot
+  </button>
   <div id="info">
     W/S = Drive<br>
     A/D = Turn<br>
@@ -93,7 +96,7 @@ const camera = new THREE.PerspectiveCamera(
 );
 
 // ─── RENDERER ────────────────────────────────────────────
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.shadowMap.enabled = true;
@@ -754,6 +757,15 @@ document.getElementById('groundUpload').addEventListener('change', (e) => {
 
 document.getElementById('lightColor').addEventListener('input', (e) => {
   directionalLight.color.set(e.target.value);
+});
+
+// ─── SCREENSHOT ──────────────────────────────────────────
+document.getElementById('screenshotBtn').addEventListener('click', () => {
+  renderer.render(scene, camera);
+  const link = document.createElement('a');
+  link.download = 'screenshot.png';
+  link.href = renderer.domElement.toDataURL('image/png');
+  link.click();
 });
 </script>
 </body>
