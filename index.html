@@ -3,20 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <title>Car Drive</title>
-
 <style>
 * { box-sizing: border-box; }
-
 body {
   margin: 0;
   overflow: hidden;
   background: #000;
   font-family: Arial, sans-serif;
 }
-
-canvas {
-  display: block;
-}
+canvas { display: block; }
 
 #uiPanel {
   position: absolute;
@@ -29,16 +24,14 @@ canvas {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 260px;
+  max-width: 250px;
 }
-
 #uiPanel label {
   display: flex;
   flex-direction: column;
   font-size: 14px;
   gap: 4px;
 }
-
 #info {
   font-size: 13px;
   color: #333;
@@ -50,54 +43,46 @@ canvas {
   padding: 10px;
   border: none;
   border-radius: 8px;
-  background: #1f6fff;
+  background: #222;
   color: white;
-  font-size: 14px;
   cursor: pointer;
-  transition: background 0.2s ease;
+  font-size: 14px;
+  transition: background 0.2s;
 }
 
 #screenshotButton:hover {
-  background: #1557cc;
+  background: #444;
 }
 
 #screenshotMessage {
   font-size: 12px;
-  color: #007700;
-  min-height: 14px;
+  color: #006600;
+  display: none;
 }
+
 </style>
 </head>
-
 <body>
 
 <div id="uiPanel">
-
   <label>Car Texture
     <input type="file" id="carTextureUpload">
   </label>
-
   <label>Building Texture
     <input type="file" id="buildingTextureUpload">
   </label>
-
   <label>Skybox / 360 Background
     <input type="file" id="skyboxUpload">
   </label>
-
   <label>Ground Texture
     <input type="file" id="groundUpload">
   </label>
-
   <label>Sunlight Color
     <input type="color" id="lightColor" value="#ffffff">
   </label>
 
-  <button id="screenshotButton">
-    Save Screenshot
-  </button>
-
-  <div id="screenshotMessage"></div>
+  <button id="screenshotButton">Take Screenshot</button>
+  <div id="screenshotMessage">Screenshot saved!</div>
 
   <div id="info">
     W/S = Drive<br>
@@ -110,7 +95,6 @@ canvas {
     <div>Current: <span id="currentLap">0:00.000</span></div>
     <div>Best:&nbsp;&nbsp;&nbsp;&nbsp;<span id="bestLap">--:--.---</span></div>
   </div>
-
 </div>
 
 <script type="importmap">
@@ -122,32 +106,19 @@ canvas {
 </script>
 
 <script type="module">
-
 import * as THREE from 'three';
 import { GLTFLoader } from './jsm/loaders/GLTFLoader.js';
 
-// ─────────────────────────────────────────────────────────
-// SCENE
-// ─────────────────────────────────────────────────────────
-
+// ─── SCENE ───────────────────────────────────────────────
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xbfd1e5, 80, 600);
 
-// ─────────────────────────────────────────────────────────
-// CAMERA
-// ─────────────────────────────────────────────────────────
-
+// ─── CAMERA ──────────────────────────────────────────────
 const camera = new THREE.PerspectiveCamera(
-  75,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  3000
+  75, window.innerWidth / window.innerHeight, 0.1, 3000
 );
 
-// ─────────────────────────────────────────────────────────
-// RENDERER
-// ─────────────────────────────────────────────────────────
-
+// ─── RENDERER ────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
   preserveDrawingBuffer: true
@@ -155,106 +126,73 @@ const renderer = new THREE.WebGLRenderer({
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
-
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
-
 document.body.appendChild(renderer.domElement);
 
-// ─────────────────────────────────────────────────────────
-// LIGHTING
-// ─────────────────────────────────────────────────────────
-
+// ─── LIGHTING ────────────────────────────────────────────
 const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
 scene.add(ambientLight);
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
-
 directionalLight.position.set(100, 200, 100);
-
 directionalLight.castShadow = true;
 directionalLight.shadow.mapSize.set(4096, 4096);
-
 directionalLight.shadow.camera.near = 1;
 directionalLight.shadow.camera.far = 800;
-directionalLight.shadow.camera.left = -350;
-directionalLight.shadow.camera.right = 200;
-directionalLight.shadow.camera.top = 250;
+directionalLight.shadow.camera.left   = -350;
+directionalLight.shadow.camera.right  =  200;
+directionalLight.shadow.camera.top    =  250;
 directionalLight.shadow.camera.bottom = -200;
-
 directionalLight.shadow.bias = -0.0005;
-
 scene.add(directionalLight);
 
-// ─────────────────────────────────────────────────────────
-// LOADERS
-// ─────────────────────────────────────────────────────────
-
+// ─── LOADERS ─────────────────────────────────────────────
 const textureLoader = new THREE.TextureLoader();
-const gltfLoader = new GLTFLoader();
+const gltfLoader   = new GLTFLoader();
 
-// ─────────────────────────────────────────────────────────
-// SKYBOX
-// ─────────────────────────────────────────────────────────
-
+// ─── SKYBOX ──────────────────────────────────────────────
 textureLoader.load('RMSField.png', (tex) => {
   tex.mapping = THREE.EquirectangularReflectionMapping;
   scene.background = tex;
 });
 
-// ─────────────────────────────────────────────────────────
-// GROUND
-// ─────────────────────────────────────────────────────────
-
+// ─── GROUND ──────────────────────────────────────────────
 const grassTexture = textureLoader.load('RMSgrass.png');
-
 grassTexture.wrapS = THREE.RepeatWrapping;
 grassTexture.wrapT = THREE.RepeatWrapping;
 grassTexture.repeat.set(300, 300);
 
-const groundMaterial = new THREE.MeshStandardMaterial({
-  map: grassTexture
-});
-
+const groundMaterial = new THREE.MeshStandardMaterial({ map: grassTexture });
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(6000, 6000),
   groundMaterial
 );
-
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
-
 scene.add(ground);
 
-// ─────────────────────────────────────────────────────────
-// CAR STATE
-// ─────────────────────────────────────────────────────────
-
+// ─── CAR STATE ───────────────────────────────────────────
 let carModel = null;
 
+// The GLB has three flat sibling nodes: body_3, tire1_4, tire2_2
+// We wrap each wheel in a pivot group AFTER the full load is done.
 let frontWheelPivot = null;
 let frontWheelSpinner = null;
-let frontWheelMesh = null;
-
-let backWheelPivot = null;
+let frontWheelMesh  = null;
+let backWheelPivot  = null;
 let backWheelSpinner = null;
 
 let wheelSteer = 0;
-
-const maxWheelSteer = 0.3;
+const maxWheelSteer  = 0.3;
 const wheelSpinFactor = 0.4;
 
-// ─────────────────────────────────────────────────────────
-// WHEEL PIVOT HELPER
-// ─────────────────────────────────────────────────────────
-
+// ─── PIVOT HELPER ────────────────────────────────────────
 function makeWheelPivot(wheel) {
-
   const pivot = new THREE.Group();
   const parent = wheel.parent;
 
   const box = new THREE.Box3().setFromObject(wheel);
-
   const worldCenter = new THREE.Vector3();
   box.getCenter(worldCenter);
 
@@ -264,85 +202,199 @@ function makeWheelPivot(wheel) {
   pivot.position.copy(localCenter);
 
   parent.remove(wheel);
-
   wheel.position.sub(localCenter);
-
   pivot.add(wheel);
 
   return pivot;
 }
 
-// ─────────────────────────────────────────────────────────
-// LOAD CAR
-// ─────────────────────────────────────────────────────────
-
+// ─── LOAD CAR ────────────────────────────────────────────
 gltfLoader.load('Car.glb', (gltf) => {
-
   carModel = gltf.scene;
-
   carModel.scale.set(1, 1, 1);
-
   carModel.position.set(-54, 0, 0);
   carModel.rotation.y = Math.PI / 2;
 
   const box = new THREE.Box3().setFromObject(carModel);
-
   carModel.position.y -= box.min.y;
   carModel.position.y += 0.38;
 
   carModel.traverse((child) => {
     if (child.isMesh) {
-      child.castShadow = true;
+      child.castShadow    = true;
       child.receiveShadow = true;
     }
   });
 
   scene.add(carModel);
-
   smoothedCarPos.copy(carModel.position);
 
   carModel.updateMatrixWorld(true);
 
   const tireFront = carModel.getObjectByName('tire1_4');
-  const tireBack = carModel.getObjectByName('tire2_2');
+  const tireBack  = carModel.getObjectByName('tire2_2');
 
   if (tireFront) {
-
-    frontWheelMesh = tireFront;
-
+    frontWheelMesh  = tireFront;
     frontWheelPivot = makeWheelPivot(tireFront);
 
     frontWheelSpinner = new THREE.Group();
-
     frontWheelPivot.add(frontWheelSpinner);
-
     frontWheelPivot.remove(tireFront);
-
     frontWheelSpinner.add(tireFront);
   }
 
   if (tireBack) {
-
     backWheelPivot = makeWheelPivot(tireBack);
 
     backWheelSpinner = new THREE.Group();
-
     backWheelPivot.add(backWheelSpinner);
-
     backWheelPivot.remove(tireBack);
-
     backWheelSpinner.add(tireBack);
   }
 });
 
-// ─────────────────────────────────────────────────────────
-// BUILDING
-// ─────────────────────────────────────────────────────────
+// ─── COLLISION ───────────────────────────────────────────
+const aabbObstacles = [];
+const aabbModels    = [];
+const _carBox       = new THREE.Box3();
+const _meshBox      = new THREE.Box3();
 
+function registerAabbModel(model) { aabbModels.push(model); }
+
+function updateAabbObstacles() {
+  aabbObstacles.length = 0;
+  for (const model of aabbModels) {
+    model.traverse((child) => {
+      if (child.isMesh) {
+        _meshBox.setFromObject(child);
+        aabbObstacles.push(_meshBox.clone());
+      }
+    });
+  }
+}
+
+const BOUNCE      = 0.4;
+const CAR_INSET_X = 0.7;
+const CAR_INSET_Z = 1.0;
+
+function resolveAabb() {
+  if (!carModel) return;
+
+  _carBox.setFromObject(carModel);
+  _carBox.min.x += CAR_INSET_X;
+  _carBox.max.x -= CAR_INSET_X;
+  _carBox.min.z += CAR_INSET_Z;
+  _carBox.max.z -= CAR_INSET_Z;
+
+  for (const box of aabbObstacles) {
+    if (!_carBox.intersectsBox(box)) continue;
+
+    const overlapX = Math.min(
+      _carBox.max.x - box.min.x,
+      box.max.x - _carBox.min.x
+    );
+
+    const overlapZ = Math.min(
+      _carBox.max.z - box.min.z,
+      box.max.z - _carBox.min.z
+    );
+
+    if (overlapX < overlapZ) {
+      const dir =
+        _carBox.getCenter(new THREE.Vector3()).x <
+        box.getCenter(new THREE.Vector3()).x ? -1 : 1;
+
+      carModel.position.x += dir * overlapX;
+    } else {
+      const dir =
+        _carBox.getCenter(new THREE.Vector3()).z <
+        box.getCenter(new THREE.Vector3()).z ? -1 : 1;
+
+      carModel.position.z += dir * overlapZ;
+    }
+
+    speed = -speed * BOUNCE;
+
+    _carBox.setFromObject(carModel);
+  }
+}
+
+const wallMeshes = [];
+const _raycaster = new THREE.Raycaster();
+
+const RAY_ORIGIN_Y = 2.0;
+const RAY_DOWN     = new THREE.Vector3(0, -1, 0);
+const RAY_FAR      = RAY_ORIGIN_Y + 0.5;
+
+const CAR_HALF_W = 1.0;
+const CAR_HALF_L = 1.8;
+
+const SAMPLE_OFFSETS_LOCAL = [
+  new THREE.Vector3( 0,           0,  0           ),
+  new THREE.Vector3( CAR_HALF_W,  0,  0           ),
+  new THREE.Vector3(-CAR_HALF_W,  0,  0           ),
+  new THREE.Vector3( 0,           0, -CAR_HALF_L  ),
+  new THREE.Vector3( 0,           0,  CAR_HALF_L  ),
+  new THREE.Vector3( CAR_HALF_W,  0, -CAR_HALF_L  ),
+  new THREE.Vector3(-CAR_HALF_W,  0, -CAR_HALF_L  ),
+  new THREE.Vector3( CAR_HALF_W,  0,  CAR_HALF_L  ),
+  new THREE.Vector3(-CAR_HALF_W,  0,  CAR_HALF_L  ),
+];
+
+function resolveWallRaycasts() {
+  if (!carModel || wallMeshes.length === 0) return;
+
+  const carPos  = carModel.position;
+  const carQuat = carModel.quaternion;
+
+  for (const localOffset of SAMPLE_OFFSETS_LOCAL) {
+
+    const worldOffset = localOffset.clone().applyQuaternion(carQuat);
+
+    const origin = new THREE.Vector3(
+      carPos.x + worldOffset.x,
+      RAY_ORIGIN_Y,
+      carPos.z + worldOffset.z
+    );
+
+    _raycaster.set(origin, RAY_DOWN);
+    _raycaster.far = RAY_FAR;
+
+    const hits = _raycaster.intersectObjects(wallMeshes, false);
+
+    if (hits.length === 0) continue;
+
+    const hit = hits[0];
+
+    const wallNormal = hit.face.normal.clone()
+      .transformDirection(hit.object.matrixWorld);
+
+    wallNormal.y = 0;
+
+    if (wallNormal.lengthSq() < 0.0001) continue;
+
+    wallNormal.normalize();
+
+    const toHit = new THREE.Vector3(
+      carPos.x - hit.point.x,
+      0,
+      carPos.z - hit.point.z
+    );
+
+    if (wallNormal.dot(toHit) < 0) wallNormal.negate();
+
+    carModel.position.addScaledVector(wallNormal, 1.5);
+    speed *= -0.3;
+
+    break;
+  }
+}
+
+// ─── BUILDING ────────────────────────────────────────────
 let buildingModel;
 
 gltfLoader.load('Tower.glb', (gltf) => {
-
   buildingModel = gltf.scene;
 
   buildingModel.position.set(-60, 0, -40);
@@ -356,18 +408,17 @@ gltfLoader.load('Tower.glb', (gltf) => {
   });
 
   scene.add(buildingModel);
+  registerAabbModel(buildingModel);
 });
 
-// ─────────────────────────────────────────────────────────
-// TRACK
-// ─────────────────────────────────────────────────────────
-
+// ─── TRACK ───────────────────────────────────────────────
 let trackModel;
+let finishLineBox = null;
+let hasLeftFinishLine = false;
 
 gltfLoader.load('Track.glb', (gltf) => {
 
   trackModel = gltf.scene;
-
   trackModel.position.y = 0.76;
 
   trackModel.traverse((child) => {
@@ -378,30 +429,39 @@ gltfLoader.load('Track.glb', (gltf) => {
   });
 
   scene.add(trackModel);
+  trackModel.updateMatrixWorld(true);
+
+  const wallNode = trackModel.getObjectByName('Wall');
+
+  if (wallNode) {
+    wallNode.traverse((child) => {
+      if (child.isMesh) wallMeshes.push(child);
+    });
+  }
+
+  const finishNode = trackModel.getObjectByName('Finishline');
+
+  if (finishNode) {
+    finishLineBox = new THREE.Box3().setFromObject(finishNode);
+    finishLineBox.min.y -= 1;
+    finishLineBox.max.y += 1;
+    finishNode.visible = false;
+  }
 });
 
-// ─────────────────────────────────────────────────────────
-// TEXTURE HELPERS
-// ─────────────────────────────────────────────────────────
-
+// ─── TEXTURE HELPERS ─────────────────────────────────────
 function applyTexture(model, texture) {
-
   texture.flipY = false;
 
   model.traverse((child) => {
-
     if (child.isMesh) {
-
       child.material.map = texture;
       child.material.needsUpdate = true;
     }
   });
 }
 
-// ─────────────────────────────────────────────────────────
-// INPUT
-// ─────────────────────────────────────────────────────────
-
+// ─── INPUT ───────────────────────────────────────────────
 const keys = {};
 
 window.addEventListener('keydown', (e) => {
@@ -412,59 +472,45 @@ window.addEventListener('keyup', (e) => {
   keys[e.key.toLowerCase()] = false;
 });
 
-// ─────────────────────────────────────────────────────────
-// MOUSE LOOK
-// ─────────────────────────────────────────────────────────
-
+// ─── MOUSE LOOK ──────────────────────────────────────────
 let mouseDown = false;
-
-let yaw = 0;
+let yaw   = 0;
 let pitch = 0;
 
 const sensitivity = 0.004;
 
-window.addEventListener('mousedown', () => {
-  mouseDown = true;
-});
-
-window.addEventListener('mouseup', () => {
-  mouseDown = false;
-});
+window.addEventListener('mousedown', () => mouseDown = true);
+window.addEventListener('mouseup', () => mouseDown = false);
 
 window.addEventListener('mousemove', (e) => {
 
   if (!mouseDown) return;
 
-  yaw -= e.movementX * sensitivity;
+  yaw   -= e.movementX * sensitivity;
   pitch -= e.movementY * sensitivity;
 
   pitch = Math.max(-0.8, Math.min(0.35, pitch));
 });
 
-// ─────────────────────────────────────────────────────────
-// DRIVING
-// ─────────────────────────────────────────────────────────
-
+// ─── DRIVING PHYSICS ─────────────────────────────────────
 let speed = 0;
 
-const maxSpeed = 0.42;
+const maxSpeed     = 0.42;
 const acceleration = 0.004;
-const friction = 0.004;
-const turnSpeed = 0.032;
+const friction     = 0.004;
+const turnSpeed    = 0.032;
 
-let lateralVel = new THREE.Vector3(0,0,0);
+// ─── DRIFT ───────────────────────────────────────────────
+let lateralVel = new THREE.Vector3(0, 0, 0);
 
-const DRIFT_GRIP = 0.18;
+const DRIFT_GRIP       = 0.18;
 const DRIFT_GRIP_SLIDE = 0.04;
-const DRIFT_BUILDUP = 0.035;
+const DRIFT_BUILDUP    = 0.035;
 const DRIFT_TURN_BOOST = 1.5;
-const NATURAL_BLEED = 0.012;
-const DRIFT_FRICTION = 0.0015;
+const NATURAL_BLEED    = 0.012;
+const DRIFT_FRICTION   = 0.0015;
 
-// ─────────────────────────────────────────────────────────
-// CAMERA
-// ─────────────────────────────────────────────────────────
-
+// ─── CAMERA ──────────────────────────────────────────────
 const baseOffset = new THREE.Vector3(0, 3, 8);
 const lookOffset = new THREE.Vector3(0, 1, 0);
 
@@ -473,19 +519,44 @@ const smoothedCarPos = new THREE.Vector3();
 const _spinAxis = new THREE.Vector3(1, 0, 0);
 const _spinQ = new THREE.Quaternion();
 
-// ─────────────────────────────────────────────────────────
-// STEERING
-// ─────────────────────────────────────────────────────────
+// ─── LAP TIMER ───────────────────────────────────────────
+const currentLapEl = document.getElementById('currentLap');
+const bestLapEl    = document.getElementById('bestLap');
 
+let lapStartTime = null;
+let bestLapMs = null;
+
+const checkpointBox = new THREE.Box3(
+  new THREE.Vector3(-148, -2, 16),
+  new THREE.Vector3( -94,  4, 37)
+);
+
+let checkpointCleared = false;
+
+function formatTime(ms) {
+
+  const m = Math.floor(ms / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  const mil = Math.floor(ms % 1000);
+
+  return `${m}:${String(s).padStart(2,'0')}.${String(mil).padStart(3,'0')}`;
+}
+
+function updateLapTimer() {
+
+  if (lapStartTime === null) return;
+
+  currentLapEl.textContent =
+    formatTime(performance.now() - lapStartTime);
+}
+
+// ─── STEERING ────────────────────────────────────────────
 let steerRate = 0;
 
 const STEER_BUILDUP = 0.14;
 const STEER_FALLOFF = 0.18;
 
-// ─────────────────────────────────────────────────────────
-// ANIMATION LOOP
-// ─────────────────────────────────────────────────────────
-
+// ─── ANIMATION LOOP ──────────────────────────────────────
 function animate() {
 
   requestAnimationFrame(animate);
@@ -494,11 +565,10 @@ function animate() {
 
     if (keys['w']) {
       speed += acceleration;
-    }
-    else if (keys['s']) {
+    } else if (keys['s']) {
       speed -= acceleration;
-    }
-    else {
+    } else {
+
       if (speed > friction) speed -= friction;
       else if (speed < -friction) speed += friction;
       else speed = 0;
@@ -508,23 +578,19 @@ function animate() {
 
     const isDrifting = keys[' '] && Math.abs(speed) > maxSpeed * 0.3;
 
-    const speedFactor = Math.min(Math.abs(speed) / maxSpeed, 1);
+    const speedFactor =
+      Math.min(Math.abs(speed) / maxSpeed, 1);
 
     const turnDir = speed < 0 ? -1 : 1;
 
-    const activeTurnSpeed = isDrifting
-      ? turnSpeed * DRIFT_TURN_BOOST
-      : turnSpeed;
+    const activeTurnSpeed =
+      isDrifting ? turnSpeed * DRIFT_TURN_BOOST : turnSpeed;
 
     const steerInput =
-      (keys['a'] ? 1 : 0) -
-      (keys['d'] ? 1 : 0);
+      (keys['a'] ? 1 : 0) - (keys['d'] ? 1 : 0);
 
     const steerTarget =
-      steerInput *
-      activeTurnSpeed *
-      speedFactor *
-      turnDir;
+      steerInput * activeTurnSpeed * speedFactor * turnDir;
 
     steerRate +=
       (steerTarget - steerRate) *
@@ -532,15 +598,15 @@ function animate() {
 
     carModel.rotation.y += steerRate;
 
-    const facingDir = new THREE.Vector3(0,0,-1)
+    const facingDir = new THREE.Vector3(0, 0, -1)
       .applyQuaternion(carModel.quaternion);
 
-    const forwardVel =
-      facingDir.clone().multiplyScalar(speed);
+    const forwardVel = facingDir.clone()
+      .multiplyScalar(speed);
 
     if (isDrifting) {
 
-      const rightDir = new THREE.Vector3(1,0,0)
+      const rightDir = new THREE.Vector3(1, 0, 0)
         .applyQuaternion(carModel.quaternion);
 
       lateralVel.addScaledVector(
@@ -557,15 +623,12 @@ function animate() {
       lateralVel.multiplyScalar(1 - DRIFT_GRIP_SLIDE);
 
       speed *= (1 - DRIFT_FRICTION);
-    }
-    else {
 
-      if (
-        steerInput !== 0 &&
-        Math.abs(speed) > maxSpeed * 0.2
-      ) {
+    } else {
 
-        const rightDir = new THREE.Vector3(1,0,0)
+      if (steerInput !== 0 && Math.abs(speed) > maxSpeed * 0.2) {
+
+        const rightDir = new THREE.Vector3(1, 0, 0)
           .applyQuaternion(carModel.quaternion);
 
         lateralVel.addScaledVector(
@@ -583,6 +646,10 @@ function animate() {
 
     carModel.position.add(totalVel);
 
+    updateAabbObstacles();
+    resolveAabb();
+    resolveWallRaycasts();
+
     if (frontWheelPivot) {
 
       let steerTarget = 0;
@@ -592,8 +659,7 @@ function animate() {
 
       if (isDrifting) steerTarget *= 1.5;
 
-      wheelSteer +=
-        (steerTarget - wheelSteer) * 0.15;
+      wheelSteer += (steerTarget - wheelSteer) * 0.15;
 
       frontWheelPivot.rotation.y = wheelSteer;
 
@@ -617,12 +683,7 @@ function animate() {
 
     smoothedCarPos.lerp(carModel.position, 0.15);
 
-    const rot = new THREE.Euler(
-      pitch,
-      yaw,
-      0,
-      'YXZ'
-    );
+    const rot = new THREE.Euler(pitch, yaw, 0, 'YXZ');
 
     const offset = baseOffset.clone()
       .applyEuler(rot)
@@ -643,10 +704,7 @@ function animate() {
 
 animate();
 
-// ─────────────────────────────────────────────────────────
-// RESIZE
-// ─────────────────────────────────────────────────────────
-
+// ─── RESIZE ──────────────────────────────────────────────
 window.addEventListener('resize', () => {
 
   camera.aspect =
@@ -660,10 +718,7 @@ window.addEventListener('resize', () => {
   );
 });
 
-// ─────────────────────────────────────────────────────────
-// TEXTURE UPLOADS
-// ─────────────────────────────────────────────────────────
-
+// ─── TEXTURE UPLOADS ─────────────────────────────────────
 document.getElementById('carTextureUpload')
 .addEventListener('change', (e) => {
 
@@ -711,7 +766,7 @@ document.getElementById('groundUpload')
       tex.wrapS = THREE.RepeatWrapping;
       tex.wrapT = THREE.RepeatWrapping;
 
-      tex.repeat.set(300,300);
+      tex.repeat.set(300, 300);
 
       groundMaterial.map = tex;
       groundMaterial.needsUpdate = true;
@@ -721,14 +776,10 @@ document.getElementById('groundUpload')
 
 document.getElementById('lightColor')
 .addEventListener('input', (e) => {
-
   directionalLight.color.set(e.target.value);
 });
 
-// ─────────────────────────────────────────────────────────
-// SCREENSHOT BUTTON
-// ─────────────────────────────────────────────────────────
-
+// ─── SCREENSHOT BUTTON ───────────────────────────────────
 const screenshotButton =
   document.getElementById('screenshotButton');
 
@@ -739,33 +790,24 @@ screenshotButton.addEventListener('click', () => {
 
   renderer.render(scene, camera);
 
-  const imageURL =
-    renderer.domElement.toDataURL('image/png');
-
   const link = document.createElement('a');
 
-  const timestamp =
-    new Date()
-      .toISOString()
-      .replace(/[:.]/g, '-');
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[:.]/g, '-');
 
-  link.href = imageURL;
   link.download = `texture-map-scene-${timestamp}.png`;
 
-  document.body.appendChild(link);
+  link.href = renderer.domElement.toDataURL('image/png');
 
   link.click();
 
-  document.body.removeChild(link);
-
-  screenshotMessage.textContent =
-    'Screenshot saved!';
+  screenshotMessage.style.display = 'block';
 
   setTimeout(() => {
-    screenshotMessage.textContent = '';
-  }, 2500);
+    screenshotMessage.style.display = 'none';
+  }, 2000);
 });
-
 </script>
 </body>
 </html>
