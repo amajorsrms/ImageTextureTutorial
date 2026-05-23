@@ -39,6 +39,32 @@ canvas { display: block; }
   line-height: 1.6;
 }
 
+/* Three color pickers side by side */
+#colorControls {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+}
+#colorControls label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 11px;
+  color: #444;
+  gap: 4px;
+  line-height: 1.3;
+  text-align: center;
+}
+#colorControls input[type="color"] {
+  width: 100%;
+  height: 28px;
+  padding: 1px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
 #lockOverlay {
   position: absolute;
   inset: 0;
@@ -49,7 +75,7 @@ canvas { display: block; }
   align-items: center;
   justify-content: center;
   gap: 18px;
-  pointer-events: none; /* lets clicks through to the UI panel */
+  pointer-events: none;
 }
 #lockOverlay .lock-icon {
   font-size: 64px;
@@ -93,9 +119,19 @@ canvas { display: block; }
   <label>Ground Texture
     <input type="file" id="groundUpload">
   </label>
-  <label>Sunlight Color
-    <input type="color" id="lightColor" value="#ffffff">
-  </label>
+
+  <div id="colorControls">
+    <label>Ambient<br>Color
+      <input type="color" id="ambientColor" value="#ffffff">
+    </label>
+    <label>Sunlight<br>Color
+      <input type="color" id="lightColor" value="#ffffff">
+    </label>
+    <label>Fog<br>Color
+      <input type="color" id="fogColor" value="#bfd1e5">
+    </label>
+  </div>
+
   <button id="screenshotBtn" style="padding:6px 10px;border-radius:6px;cursor:pointer;font-size:13px;">
     Screenshot
   </button>
@@ -127,7 +163,6 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xbfd1e5, 80, 600);
 
 // ─── DRIVE LOCK ──────────────────────────────────────────
-// Driving is disabled until the student uploads a car texture.
 let carTextureApplied = false;
 const lockOverlay = document.getElementById('lockOverlay');
 
@@ -145,7 +180,9 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 document.body.appendChild(renderer.domElement);
 
 // ─── LIGHTING ────────────────────────────────────────────
-const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+// Ambient at 1.0 so textures render close to their original colours by default.
+// The directional "sun" light adds directionality and warmth on top.
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
 scene.add(ambientLight);
 
 const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
@@ -189,14 +226,14 @@ scene.add(ground);
 // ─── CAR STATE ───────────────────────────────────────────
 let carModel = null;
 
-let frontWheelPivot = null;
+let frontWheelPivot   = null;
 let frontWheelSpinner = null;
-let frontWheelMesh  = null;
-let backWheelPivot  = null;
-let backWheelSpinner = null;
+let frontWheelMesh    = null;
+let backWheelPivot    = null;
+let backWheelSpinner  = null;
 
 let wheelSteer = 0;
-const maxWheelSteer  = 0.3;
+const maxWheelSteer   = 0.3;
 const wheelSpinFactor = 0.4;
 
 // ─── PIVOT HELPER ────────────────────────────────────────
@@ -247,8 +284,8 @@ gltfLoader.load('Car.glb', (gltf) => {
   const tireBack  = carModel.getObjectByName('tire2_2');
 
   if (tireFront) {
-    frontWheelMesh  = tireFront;
-    frontWheelPivot = makeWheelPivot(tireFront);
+    frontWheelMesh    = tireFront;
+    frontWheelPivot   = makeWheelPivot(tireFront);
     frontWheelSpinner = new THREE.Group();
     frontWheelPivot.add(frontWheelSpinner);
     frontWheelPivot.remove(tireFront);
@@ -258,7 +295,7 @@ gltfLoader.load('Car.glb', (gltf) => {
   }
 
   if (tireBack) {
-    backWheelPivot = makeWheelPivot(tireBack);
+    backWheelPivot   = makeWheelPivot(tireBack);
     backWheelSpinner = new THREE.Group();
     backWheelPivot.add(backWheelSpinner);
     backWheelPivot.remove(tireBack);
@@ -532,20 +569,28 @@ let steerRate = 0;
 const STEER_BUILDUP  = 0.14;
 const STEER_FALLOFF  = 0.18;
 
+// ─── DELTA TIME ──────────────────────────────────────────
+let lastTime = null;
 
 function animate() {
   requestAnimationFrame(animate);
+
+  const now   = performance.now();
+  const delta = lastTime === null
+    ? 1
+    : Math.min((now - lastTime) / (1000 / 60), 3);
+  lastTime = now;
 
   if (carModel && carTextureApplied) {
 
     // ── Acceleration & friction ─────────────────────────
     if (keys['w']) {
-      speed += acceleration;
+      speed += acceleration * delta;
     } else if (keys['s']) {
-      speed -= acceleration;
+      speed -= acceleration * delta;
     } else {
-      if (speed >  friction) speed -= friction;
-      else if (speed < -friction) speed += friction;
+      if      (speed >  friction * delta) speed -= friction * delta;
+      else if (speed < -friction * delta) speed += friction * delta;
       else speed = 0;
     }
     speed = Math.max(-maxSpeed, Math.min(maxSpeed, speed));
@@ -559,10 +604,10 @@ function animate() {
       ? turnSpeed * DRIFT_TURN_BOOST
       : turnSpeed;
 
-    const steerInput = (keys['a'] ? 1 : 0) - (keys['d'] ? 1 : 0);
+    const steerInput  = (keys['a'] ? 1 : 0) - (keys['d'] ? 1 : 0);
     const steerTarget = steerInput * activeTurnSpeed * speedFactor * turnDir;
-    steerRate += (steerTarget - steerRate) * (steerInput !== 0 ? STEER_BUILDUP : STEER_FALLOFF);
-    carModel.rotation.y += steerRate;
+    steerRate += (steerTarget - steerRate) * (steerInput !== 0 ? STEER_BUILDUP : STEER_FALLOFF) * delta;
+    carModel.rotation.y += steerRate * delta;
 
     const facingDir = new THREE.Vector3(0, 0, -1)
       .applyQuaternion(carModel.quaternion);
@@ -571,21 +616,19 @@ function animate() {
 
     if (isDrifting) {
       const rightDir = new THREE.Vector3(1, 0, 0).applyQuaternion(carModel.quaternion);
-      lateralVel.addScaledVector(rightDir, steerInput * DRIFT_BUILDUP * speedFactor);
+      lateralVel.addScaledVector(rightDir, steerInput * DRIFT_BUILDUP * speedFactor * delta);
 
       const maxLateral = Math.abs(speed) * 0.9;
-      if (lateralVel.length() > maxLateral) {
-        lateralVel.setLength(maxLateral);
-      }
+      if (lateralVel.length() > maxLateral) lateralVel.setLength(maxLateral);
 
-      lateralVel.multiplyScalar(1 - DRIFT_GRIP_SLIDE);
-      speed *= (1 - DRIFT_FRICTION);
+      lateralVel.multiplyScalar(1 - DRIFT_GRIP_SLIDE * delta);
+      speed *= (1 - DRIFT_FRICTION * delta);
     } else {
       if (steerInput !== 0 && Math.abs(speed) > maxSpeed * 0.2) {
         const rightDir = new THREE.Vector3(1, 0, 0).applyQuaternion(carModel.quaternion);
-        lateralVel.addScaledVector(rightDir, steerInput * NATURAL_BLEED * speedFactor);
+        lateralVel.addScaledVector(rightDir, steerInput * NATURAL_BLEED * speedFactor * delta);
       }
-      lateralVel.multiplyScalar(1 - DRIFT_GRIP);
+      lateralVel.multiplyScalar(1 - DRIFT_GRIP * delta);
     }
 
     const totalVel = forwardVel.clone().add(lateralVel);
@@ -640,24 +683,24 @@ function animate() {
       if (keys['d']) steerTarget = -maxWheelSteer;
       if (isDrifting) steerTarget *= 1.5;
 
-      wheelSteer += (steerTarget - wheelSteer) * 0.15;
+      wheelSteer += (steerTarget - wheelSteer) * 0.15 * delta;
       frontWheelPivot.rotation.y = wheelSteer;
 
-      _spinQ.setFromAxisAngle(_spinAxis, -speed * wheelSpinFactor);
+      _spinQ.setFromAxisAngle(_spinAxis, -speed * wheelSpinFactor * delta);
       frontWheelSpinner.quaternion.premultiply(_spinQ);
     }
 
     // ── Back wheel: spin only ───────────────────────────
     if (backWheelSpinner) {
-      _spinQ.setFromAxisAngle(_spinAxis, -speed * wheelSpinFactor);
+      _spinQ.setFromAxisAngle(_spinAxis, -speed * wheelSpinFactor * delta);
       backWheelSpinner.quaternion.premultiply(_spinQ);
     }
 
     // ── Camera follow ───────────────────────────────────
-    smoothedCarPos.lerp(carModel.position, 0.15);
+    smoothedCarPos.lerp(carModel.position, 0.15 * delta);
     const rot    = new THREE.Euler(pitch, yaw, 0, 'YXZ');
     const offset = baseOffset.clone().applyEuler(rot).applyQuaternion(carModel.quaternion);
-    camera.position.lerp(smoothedCarPos.clone().add(offset), 0.12);
+    camera.position.lerp(smoothedCarPos.clone().add(offset), 0.12 * delta);
     camera.lookAt(smoothedCarPos.clone().add(lookOffset));
   }
 
@@ -678,7 +721,6 @@ document.getElementById('carTextureUpload').addEventListener('change', (e) => {
   if (!carModel) return;
   textureLoader.load(URL.createObjectURL(e.target.files[0]), (tex) => {
     applyTexture(carModel, tex);
-    // Unlock driving on first car texture upload
     if (!carTextureApplied) {
       carTextureApplied = true;
       lockOverlay.style.display = 'none';
@@ -709,37 +751,43 @@ document.getElementById('groundUpload').addEventListener('change', (e) => {
   });
 });
 
+// ─── COLOR CONTROLS ──────────────────────────────────────
+document.getElementById('ambientColor').addEventListener('input', (e) => {
+  ambientLight.color.set(e.target.value);
+});
+
 document.getElementById('lightColor').addEventListener('input', (e) => {
   directionalLight.color.set(e.target.value);
 });
 
+document.getElementById('fogColor').addEventListener('input', (e) => {
+  scene.fog.color.set(e.target.value);
+  // Keep the renderer's clear colour in sync so the sky beyond the fog
+  // distance matches — otherwise a thin strip of black appears at the horizon.
+  renderer.setClearColor(e.target.value);
+});
+
 // ─── SCREENSHOT ──────────────────────────────────────────
-// Composites the WebGL frame onto a 2D canvas, then draws the best lap time
-// in the top-left corner before saving — no UI elements are included.
 document.getElementById('screenshotBtn').addEventListener('click', () => {
-  // Force a fresh render so preserveDrawingBuffer has the latest frame
   renderer.render(scene, camera);
 
   const gl = renderer.domElement;
   const w  = gl.width;
   const h  = gl.height;
 
-  // Create an off-screen 2D canvas the same size as the WebGL canvas
   const composite = document.createElement('canvas');
   composite.width  = w;
   composite.height = h;
   const ctx = composite.getContext('2d');
 
-  // Draw the 3D scene as the base layer
   ctx.drawImage(gl, 0, 0);
 
-  // ── Best lap overlay ─────────────────────────────────
   const bestText = bestLapMs !== null
     ? `Best Lap  ${formatTime(bestLapMs)}`
     : 'Best Lap  --:--.---';
 
-  const padding   = Math.round(w * 0.018);   // ~18px at 1920
-  const fontSize  = Math.round(w * 0.022);   // scales with resolution
+  const padding   = Math.round(w * 0.018);
+  const fontSize  = Math.round(w * 0.022);
   const lineH     = fontSize + Math.round(fontSize * 0.5);
   const boxPad    = Math.round(fontSize * 0.55);
 
@@ -752,9 +800,8 @@ document.getElementById('screenshotBtn').addEventListener('click', () => {
   const boxW  = textW + boxPad * 2;
   const boxH  = lineH + boxPad * 1.2;
 
-  // Semi-transparent dark pill behind the text
   ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-  const r = Math.round(boxH * 0.35);   // corner radius
+  const r = Math.round(boxH * 0.35);
   ctx.beginPath();
   ctx.moveTo(boxX + r, boxY);
   ctx.lineTo(boxX + boxW - r, boxY);
@@ -768,26 +815,21 @@ document.getElementById('screenshotBtn').addEventListener('click', () => {
   ctx.closePath();
   ctx.fill();
 
-  // Thin white border on the pill
   ctx.strokeStyle = 'rgba(255,255,255,0.25)';
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  // Drop shadow on the text
   ctx.shadowColor   = 'rgba(0,0,0,0.8)';
   ctx.shadowBlur    = 6;
   ctx.shadowOffsetX = 1;
   ctx.shadowOffsetY = 1;
 
-  // White text
   ctx.fillStyle = '#ffffff';
   ctx.fillText(bestText, boxX + boxPad, boxY + boxPad * 0.6);
 
-  // Reset shadow so it doesn't affect future draws
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur  = 0;
 
-  // Download the composited image
   const link = document.createElement('a');
   link.download = 'screenshot.png';
   link.href = composite.toDataURL('image/png');
