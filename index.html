@@ -298,6 +298,11 @@ canvas { display: block; }
 .btn-secondary { background: #f0f0f0; color: #333; }
 .btn-secondary:hover { background: #e0e0e0; }
 .modal-error { color: #c00; font-size: 13px; margin: -4px 0 8px; display: none; }
+
+/* ── ROUND CLOSED MODAL ───────────────────────────────── */
+.modal-closed-icon { font-size: 48px; text-align: center; margin-bottom: 10px; }
+.modal-closed-time { font-size: 28px; font-family: monospace; color: #2563eb; text-align: center; margin: 8px 0 14px; font-weight: bold; }
+
 </style>
 </head>
 <body>
@@ -415,6 +420,19 @@ canvas { display: block; }
   </button>
 </div>
 
+<!-- ── ROUND CLOSED MODAL ────────────────────────────── -->
+<div id="roundClosedModal" class="modal-backdrop hidden">
+  <div class="modal-box" style="text-align:center;">
+    <div class="modal-closed-icon">🏁</div>
+    <h2 style="margin:0 0 8px;">Top 3 Time!</h2>
+    <div class="modal-closed-time" id="roundClosedTime">--:--.---</div>
+    <p style="margin:0 0 20px;">This round is currently closed — scores aren't being accepted right now. Come back when the next round opens!</p>
+    <div class="modal-btn-row">
+      <button class="btn-primary" id="roundClosedOk">Got it</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── IMPORT MAP (required for GLTFLoader.js to resolve 'three') ── -->
 <script type="importmap">
 {
@@ -451,6 +469,20 @@ const db    = getFirestore(fbApp);
 // Firestore doc size limit is 1 MB — well within range for 10 entries + thumbnails.
 const LB_DOC  = doc(db, 'leaderboard', 'data');
 const CR_DOC  = doc(db, 'leaderboard', 'classRecordGhost');
+const ST_DOC  = doc(db, 'leaderboard', 'settings');
+
+// ── Leaderboard pause state ───────────────────────────
+let leaderboardPaused = false;
+
+async function loadSettings() {
+  const d = await fbGet(ST_DOC);
+  leaderboardPaused = d ? !!d.paused : false;
+}
+
+// Live-listen so pause/resume is reflected immediately without a page reload
+onSnapshot(ST_DOC, (snap) => {
+  leaderboardPaused = snap.exists() ? !!snap.data().paused : false;
+});
 
 async function fbGet(ref) {
   try {
@@ -1217,6 +1249,13 @@ function openSubmitModal(lapMs, isEdit) {
 function showSubmitModal(lapMs) {
   pendingLapMs = lapMs;
 
+  // If the leaderboard is paused, show the "round closed" message instead
+  if(leaderboardPaused) {
+    document.getElementById('roundClosedTime').textContent = formatTime(lapMs);
+    roundClosedModal.classList.remove('hidden');
+    return;
+  }
+
   // If they've already submitted this session, silently update — no modal needed
   if(sessionSubmission) {
     upsertLeaderboardEntry(sessionSubmission.name, sessionSubmission.email, lapMs);
@@ -1227,6 +1266,10 @@ function showSubmitModal(lapMs) {
 }
 
 document.getElementById('submitCancel').addEventListener('click', ()=>submitModal.classList.add('hidden'));
+
+// ── Round Closed modal ────────────────────────────────
+const roundClosedModal = document.getElementById('roundClosedModal');
+document.getElementById('roundClosedOk').addEventListener('click', () => roundClosedModal.classList.add('hidden'));
 
 document.getElementById('changeInfoBtn').addEventListener('click', () => {
   // Open modal in edit mode with their current info pre-filled.
@@ -1512,6 +1555,7 @@ function animate() {
     initGhosts();
     // CR ghost is loaded inside loadLeaderboard via refreshRecordGhostFromLeaderboard
     loadLeaderboard();
+    loadSettings();
   }
 
   if(carModel && carTextureApplied) {
